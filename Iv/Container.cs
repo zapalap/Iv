@@ -49,6 +49,7 @@ namespace Iv
             }
 
             var serviceType = ServiceRegistry[type];
+            // TODO : Introduce extensible strategy for choosing the right constructor (e.g. the one that has the most registered dependencies)
             var dependencies = serviceType.GetConstructors().FirstOrDefault().GetParameters();
             var dependencyInstances = new List<object>();
 
@@ -56,11 +57,21 @@ namespace Iv
             {
                 dependencyInstances.Add(Resolve(dependency.ParameterType));
             }
-
+            // TODO : Introduce different scopes for created services. 
+            // For now the only scope is transient (one per call to Resolve()), but should also have singleton and possiblity to extend for things like one-per-request etc.
+            // container.For<IFoo>.Provide<Bar>().AsSingleton();
             var instance = Activator.CreateInstance(serviceType, dependencyInstances.ToArray());
 
             return instance;
         }
+
+        /// TODO : Use builder pattern and fluent interface to make apis like this more developer friendly. 
+        /// Ideally should be something like this: 
+        /// normal way:
+        ///     container.For<IFoo>().Provide<Bar>()
+        ///     
+        /// to instance:
+        ///     container.For<IFoo>().Provide(c => new Bar())
 
         /// <summary>
         ///  Registers service implementations for injection
@@ -78,7 +89,7 @@ namespace Iv
                 ServiceRegistry.Add(typeof(TAbstract), typeof(TConcrete));
             }
         }
-
+        
         /// <summary>
         /// Registers an already created object instance to be used during Resolve
         /// </summary>
