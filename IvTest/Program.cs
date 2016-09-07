@@ -16,7 +16,7 @@ namespace IvTest
             Container.Register<TestServiceOne, TestServiceOne>();
             Container.Register<TestServiceTwo, TestServiceTwo>();
             Container.Register<TestServiceThree, TestServiceThree>();
-            Container.Register<TestServiceNested, TestServiceNested>();
+            Container.RegisterInstance<TestServiceNested>(c => new TestServiceNested());
             Container.Register<TestController, TestController>();
 
             var controller = (TestController)Container.Resolve<TestController>();
