@@ -13,15 +13,17 @@ namespace IvTest
 
         static void Main(string[] args)
         {
-            Container.Register<TestServiceOne, TestServiceOne>();
-            Container.Register<TestServiceTwo, TestServiceTwo>();
-            Container.Register<TestServiceThree, TestServiceThree>();
-            Container.RegisterInstance<TestServiceNested>(c => new TestServiceNested());
-            Container.Register<TestController, TestController>();
+            Container.For<TestServiceOne>().Provide<TestServiceOne>();
+            Container.For<TestServiceTwo>().Provide<TestServiceTwo>();
+            Container.For<TestServiceThree>().Provide<TestServiceThree>();
+            Container.For<TestServiceNested>().Provide(c => new TestServiceNested()).AsSingleton();
+            Container.For<TestController>().Provide<TestController>();
 
-            var controller = (TestController)Container.Resolve<TestController>();
+            var controller = Container.Resolve<TestController>();
 
             controller.Work();
+
+            Container.Dispose();
 
         }
     }

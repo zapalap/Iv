@@ -9,15 +9,15 @@ namespace Iv
     /// <summary>
     /// Very simple DI container
     /// </summary>
-    public class Container
+    public class Container : IDisposable
     {
-        private Dictionary<Type, Type> ServiceRegistry;
-        private Dictionary<Type, object> InstanceRegistry;
+        public Dictionary<Type, ServiceRecord> ServiceRegistry { get; set; }
+        public HashSet<IDisposable> DisposeHistory { get; private set; }
 
         public Container()
         {
-            ServiceRegistry = new Dictionary<Type, Type>();
-            InstanceRegistry = new Dictionary<Type, object>();
+            ServiceRegistry = new Dictionary<Type, ServiceRecord>();
+            DisposeHistory = new HashSet<IDisposable>();
         }
 
         /// <summary>
@@ -30,81 +30,136 @@ namespace Iv
             return (T)Resolve(typeof(T));
         }
 
+        public object Resolve(Type type)
+        {
+            var instance =  ResolveService(type);
+
+            if (typeof(IDisposable).IsAssignableFrom(instance.GetType()))
+            {
+                DisposeHistory.Add(instance as IDisposable);
+            }
+
+            return instance;
+        }
+
         /// <summary>
         /// Obtains service instance from the container
         /// </summary>
         /// <param name="type"></param>
         /// <returns></returns>
-        public object Resolve(Type type)
+        private object ResolveService(Type type)
         {
-            //If we already have instance registered provide it right away
-            if (InstanceRegistry.ContainsKey(type))
-            {
-                return InstanceRegistry[type];
-            }
-
             if (!ServiceRegistry.ContainsKey(type))
             {
                 throw new InvalidOperationException($"No service registered for type:{type.Name}");
             }
 
-            var serviceType = ServiceRegistry[type];
+            var serviceRecord = ServiceRegistry[type];
+
+            if (serviceRecord.Provisioning == Provisioning.ByInstance && serviceRecord.Instance != null)
+            {
+                if (serviceRecord.Lifetime == Lifetime.Singleton)
+                {
+                    return serviceRecord.Instance;
+                }
+
+                if (serviceRecord.Lifetime == Lifetime.Transient)
+                {
+                    return serviceRecord.ProvideFunction.Invoke(this);
+                }
+            }
+
             // TODO : Introduce extensible strategy for choosing the right constructor (e.g. the one that has the most registered dependencies)
-            var dependencies = serviceType.GetConstructors().FirstOrDefault().GetParameters();
+            var dependencies = serviceRecord.ProvideType.GetConstructors().FirstOrDefault().GetParameters();
             var dependencyInstances = new List<object>();
 
             foreach (var dependency in dependencies)
             {
                 dependencyInstances.Add(Resolve(dependency.ParameterType));
             }
-            // TODO : Introduce different scopes for created services. 
-            // For now the only scope is transient (one per call to Resolve()), but should also have singleton and possiblity to extend for things like one-per-request etc.
-            // container.For<IFoo>.Provide<Bar>().AsSingleton();
-            var instance = Activator.CreateInstance(serviceType, dependencyInstances.ToArray());
+           
+            var instance = Activator.CreateInstance(serviceRecord.ProvideType, dependencyInstances.ToArray());
+
+            if (serviceRecord.Lifetime == Lifetime.Singleton)
+            {
+                serviceRecord.Provisioning = Provisioning.ByInstance;
+                serviceRecord.Instance = instance;
+            }
 
             return instance;
         }
 
-        /// TODO : Use builder pattern and fluent interface to make apis like this more developer friendly. 
-        /// Ideally should be something like this: 
-        /// normal way:
-        ///     container.For<IFoo>().Provide<Bar>()
-        ///     
-        /// to instance:
-        ///     container.For<IFoo>().Provide(c => new Bar())
-
-        /// <summary>
-        ///  Registers service implementations for injection
-        /// </summary>
-        /// <typeparam name="TAbstract"></typeparam>
-        /// <typeparam name="TConcrete"></typeparam>
-        public void Register<TAbstract, TConcrete>()
+        public void Dispose()
         {
-            if (ServiceRegistry.ContainsKey(typeof(TAbstract)))
+            // Dispose all instances that need disposing
+            foreach (var instance in DisposeHistory)
             {
-                ServiceRegistry[typeof(TAbstract)] = typeof(TConcrete);
-            }
-            else
-            {
-                ServiceRegistry.Add(typeof(TAbstract), typeof(TConcrete));
+                instance.Dispose();
             }
         }
-        
-        /// <summary>
-        /// Registers an already created object instance to be used during Resolve
-        /// </summary>
-        /// <typeparam name="TAbstract"></typeparam>
-        /// <param name="creator"></param>
-        public void RegisterInstance<TAbstract>(Func<Container, TAbstract> creator)
+    }
+
+    public enum Provisioning
+    {
+        ByType,
+        ByInstance
+    }
+
+    public enum Lifetime
+    {
+        Transient,
+        Singleton
+    }
+
+    public class ServiceRecord
+    {
+        public Type ProvideType { get; set; }
+        public object Instance { get; set; }
+        public Provisioning Provisioning { get; set; }
+        public Lifetime Lifetime { get; set; }
+        public Container Container { get; set; }
+        public Func<Container, object> ProvideFunction { get; set; }
+    }
+
+    public static class BindingExtensions
+    {
+        public static ServiceRecord For<TService>(this Container container)
         {
-            if (InstanceRegistry.ContainsKey(typeof(TAbstract)))
+            var record = new ServiceRecord();
+            record.Container = container;
+
+            if (container.ServiceRegistry.ContainsKey(typeof(TService)))
             {
-                InstanceRegistry[typeof(TAbstract)] = creator.Invoke(this);
+                container.ServiceRegistry[typeof(TService)] = record;
             }
             else
             {
-                InstanceRegistry.Add(typeof(TAbstract), creator.Invoke(this));
+                container.ServiceRegistry.Add(typeof(TService), record);
             }
+
+            return record;
+        }
+        
+        public static ServiceRecord Provide<TService>(this ServiceRecord record)
+        {
+            record.ProvideType = typeof(TService);
+            record.Provisioning = Provisioning.ByType;
+            record.Lifetime = Lifetime.Transient;
+            return record;
+        }
+
+        public static ServiceRecord Provide(this ServiceRecord record, Func<Container, object> provide)
+        {
+            record.Instance = provide.Invoke(record.Container);
+            record.Provisioning = Provisioning.ByInstance;
+            record.ProvideFunction = provide;
+            return record;
+        }
+
+        public static ServiceRecord AsSingleton(this ServiceRecord record)
+        {
+            record.Lifetime = Lifetime.Singleton;
+            return record;
         }
     }
 }

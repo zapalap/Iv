@@ -6,11 +6,16 @@ using System.Threading.Tasks;
 
 namespace IvTest
 {
-    public class TestServiceThree
+    public class TestServiceThree : IDisposable
     {
         public TestServiceThree()
         {
 
+        }
+
+        public void Dispose()
+        {
+            Console.WriteLine("Disposing...");
         }
 
         public void Use()
