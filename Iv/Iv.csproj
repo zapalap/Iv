@@ -40,6 +40,10 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Binding\BindingExtensions.cs" />
+    <Compile Include="Binding\Enums.cs" />
+    <Compile Include="Exceptions\DependencyResolutionException.cs" />
+    <Compile Include="Binding\ServiceRecord.cs" />
     <Compile Include="Container.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

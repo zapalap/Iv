@@ -1,8 +1,7 @@
-﻿using System;
+﻿using Iv.Binding;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Iv
 {
@@ -32,7 +31,7 @@ namespace Iv
 
         public object Resolve(Type type)
         {
-            var instance =  ResolveService(type);
+            var instance = ResolveService(type);
 
             if (typeof(IDisposable).IsAssignableFrom(instance.GetType()))
             {
@@ -51,7 +50,7 @@ namespace Iv
         {
             if (!ServiceRegistry.ContainsKey(type))
             {
-                throw new InvalidOperationException($"No service registered for type:{type.Name}");
+                throw new DependencyResolutionException($"There is no service registered for type: {type.Name}", type, ServiceRegistry);
             }
 
             var serviceRecord = ServiceRegistry[type];
@@ -77,7 +76,7 @@ namespace Iv
             {
                 dependencyInstances.Add(Resolve(dependency.ParameterType));
             }
-           
+
             var instance = Activator.CreateInstance(serviceRecord.ProvideType, dependencyInstances.ToArray());
 
             if (serviceRecord.Lifetime == Lifetime.Singleton)
@@ -96,70 +95,6 @@ namespace Iv
             {
                 instance.Dispose();
             }
-        }
-    }
-
-    public enum Provisioning
-    {
-        ByType,
-        ByInstance
-    }
-
-    public enum Lifetime
-    {
-        Transient,
-        Singleton
-    }
-
-    public class ServiceRecord
-    {
-        public Type ProvideType { get; set; }
-        public object Instance { get; set; }
-        public Provisioning Provisioning { get; set; }
-        public Lifetime Lifetime { get; set; }
-        public Container Container { get; set; }
-        public Func<Container, object> ProvideFunction { get; set; }
-    }
-
-    public static class BindingExtensions
-    {
-        public static ServiceRecord For<TService>(this Container container)
-        {
-            var record = new ServiceRecord();
-            record.Container = container;
-
-            if (container.ServiceRegistry.ContainsKey(typeof(TService)))
-            {
-                container.ServiceRegistry[typeof(TService)] = record;
-            }
-            else
-            {
-                container.ServiceRegistry.Add(typeof(TService), record);
-            }
-
-            return record;
-        }
-        
-        public static ServiceRecord Provide<TService>(this ServiceRecord record)
-        {
-            record.ProvideType = typeof(TService);
-            record.Provisioning = Provisioning.ByType;
-            record.Lifetime = Lifetime.Transient;
-            return record;
-        }
-
-        public static ServiceRecord Provide(this ServiceRecord record, Func<Container, object> provide)
-        {
-            record.Instance = provide.Invoke(record.Container);
-            record.Provisioning = Provisioning.ByInstance;
-            record.ProvideFunction = provide;
-            return record;
-        }
-
-        public static ServiceRecord AsSingleton(this ServiceRecord record)
-        {
-            record.Lifetime = Lifetime.Singleton;
-            return record;
         }
     }
 }
