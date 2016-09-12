@@ -2,7 +2,7 @@
 
 namespace Iv.Binding
 {
-    public class ServiceRecord
+    public class CachedServiceConfiguration
     {
         public Type ProvideType { get; set; }
         public object Instance { get; set; }

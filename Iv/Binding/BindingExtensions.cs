@@ -4,9 +4,9 @@ namespace Iv.Binding
 {
     public static class BindingExtensions
     {
-        public static ServiceRecord For<TService>(this Container container)
+        public static CachedServiceConfiguration For<TService>(this Container container)
         {
-            var record = new ServiceRecord();
+            var record = new CachedServiceConfiguration();
             record.Container = container;
 
             if (container.ServiceRegistry.ContainsKey(typeof(TService)))
@@ -21,7 +21,7 @@ namespace Iv.Binding
             return record;
         }
 
-        public static ServiceRecord Provide<TService>(this ServiceRecord record)
+        public static CachedServiceConfiguration Provide<TService>(this CachedServiceConfiguration record)
         {
             record.ProvideType = typeof(TService);
             record.Provisioning = Provisioning.ByType;
@@ -29,15 +29,14 @@ namespace Iv.Binding
             return record;
         }
 
-        public static ServiceRecord Provide(this ServiceRecord record, Func<Container, object> provide)
+        public static CachedServiceConfiguration Provide(this CachedServiceConfiguration record, Func<Container, object> provide)
         {
-            record.Instance = provide.Invoke(record.Container);
             record.Provisioning = Provisioning.ByInstance;
             record.ProvideFunction = provide;
             return record;
         }
 
-        public static ServiceRecord AsSingleton(this ServiceRecord record)
+        public static CachedServiceConfiguration AsSingleton(this CachedServiceConfiguration record)
         {
             record.Lifetime = Lifetime.Singleton;
             return record;

@@ -10,13 +10,13 @@ namespace Iv
     /// </summary>
     public class Container : IDisposable
     {
-        public Dictionary<Type, ServiceRecord> ServiceRegistry { get; set; }
-        public HashSet<IDisposable> DisposeHistory { get; private set; }
+        public Dictionary<Type, CachedServiceConfiguration> ServiceRegistry { get; set; }
+        public HashSet<IDisposable> InstanceCache { get; private set; }
 
         public Container()
         {
-            ServiceRegistry = new Dictionary<Type, ServiceRecord>();
-            DisposeHistory = new HashSet<IDisposable>();
+            ServiceRegistry = new Dictionary<Type, CachedServiceConfiguration>();
+            InstanceCache = new HashSet<IDisposable>();
         }
 
         /// <summary>
@@ -35,7 +35,7 @@ namespace Iv
 
             if (typeof(IDisposable).IsAssignableFrom(instance.GetType()))
             {
-                DisposeHistory.Add(instance as IDisposable);
+                InstanceCache.Add(instance as IDisposable);
             }
 
             return instance;
@@ -55,20 +55,17 @@ namespace Iv
 
             var serviceRecord = ServiceRegistry[type];
 
-            if (serviceRecord.Provisioning == Provisioning.ByInstance && serviceRecord.Instance != null)
+            if (serviceRecord.Provisioning == Provisioning.ByInstance)
             {
-                if (serviceRecord.Lifetime == Lifetime.Singleton)
-                {
-                    return serviceRecord.Instance;
-                }
-
-                if (serviceRecord.Lifetime == Lifetime.Transient)
-                {
-                    return serviceRecord.ProvideFunction.Invoke(this);
-                }
+                return ProvideByInstance(serviceRecord);
             }
 
             // TODO : Introduce extensible strategy for choosing the right constructor (e.g. the one that has the most registered dependencies)
+            return ProvideByType(serviceRecord);
+        }
+
+        private object ProvideByType(CachedServiceConfiguration serviceRecord)
+        {
             var dependencies = serviceRecord.ProvideType.GetConstructors().FirstOrDefault().GetParameters();
             var dependencyInstances = new List<object>();
 
@@ -88,10 +85,40 @@ namespace Iv
             return instance;
         }
 
+        private object ProvideByInstance(CachedServiceConfiguration serviceRecord)
+        {
+            if (serviceRecord.Instance == null)
+            {
+                serviceRecord.Instance = serviceRecord.ProvideFunction.Invoke(this);
+            }
+
+            switch (serviceRecord.Lifetime)
+            {
+                case Lifetime.Transient:
+                    EnsureProvideFunctionPresent(serviceRecord);
+                    return serviceRecord.ProvideFunction.Invoke(this);
+                case Lifetime.Singleton:
+                    return serviceRecord.Instance;
+                default:
+                    return serviceRecord.Instance;
+            }
+        }
+
+        private void EnsureProvideFunctionPresent(CachedServiceConfiguration serviceRecord)
+        {
+            if (serviceRecord.ProvideFunction == null)
+            {
+                throw new DependencyResolutionException(
+                    $"Cannot provide service instance because provider function is null",
+                    serviceRecord.ProvideType,
+                    ServiceRegistry);
+            }
+        }
+
         public void Dispose()
         {
             // Dispose all instances that need disposing
-            foreach (var instance in DisposeHistory)
+            foreach (var instance in InstanceCache)
             {
                 instance.Dispose();
             }

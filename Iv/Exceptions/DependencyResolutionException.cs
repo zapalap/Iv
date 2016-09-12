@@ -12,7 +12,7 @@ namespace Iv
     {
         public Type ForType { get; private set; }
 
-        public DependencyResolutionException(string message, Type forType, Dictionary<Type, ServiceRecord> serviceRegistry) : base(message)
+        public DependencyResolutionException(string message, Type forType, Dictionary<Type, CachedServiceConfiguration> serviceRegistry) : base(message)
         {
             ForType = forType;
             Data.Add("ServiceRegistry", serviceRegistry);
