@@ -6,18 +6,18 @@ using System.Threading.Tasks;
 
 namespace IvTest
 {
-    public class TestServiceNested : IDisposable
+    public class DisposableServiceWithId : IDisposable
     {
         public Guid Id = Guid.NewGuid();
 
-        public TestServiceNested()
+        public DisposableServiceWithId()
         {
 
         }
 
         public void Dispose()
         {
-            Console.WriteLine("Disposing...");
+            Console.WriteLine($"Disposing {Id}");
         }
 
         public void Use()
